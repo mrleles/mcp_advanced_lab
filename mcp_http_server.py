@@ -71,7 +71,7 @@ def list_files(directory: str = ".") -> str:
         files = []
         for item in sorted(path.iterdir()):
             relative_path = item.relative_to(BASE_DIR)
-            tyle_type = "DIR" if item.is_dir() else "FILE"
+            file_type = "DIR" if item.is_dir() else "FILE"
             size = item.stat() if item.is_file() else 0
             files.append(f"{file_type}: {relative_path} ({size} bytes)")
 
