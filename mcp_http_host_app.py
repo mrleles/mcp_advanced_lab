@@ -115,4 +115,16 @@ class MCPHTTPHostApp(MCPHTTPClient):
         """Execute a tool call (real MCP tool or synthetic helper)."""
         await self.connect()
 
+        if tool_name == "mcp_list_resources":
+            resources = await self.list_resources()
+            result = "Available resources:\n"
+            for resource in resources:
+                result += f"- {resource.uriTemplate}"
+                if resource.name:
+                    result += f" ({resource.name})"
+                if resource.description:
+                    result += f": {resource.description}"
+                result += "\n"
+            return result
+
         
