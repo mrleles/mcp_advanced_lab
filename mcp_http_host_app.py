@@ -127,4 +127,17 @@ class MCPHTTPHostApp(MCPHTTPClient):
                 result += "\n"
             return result
 
-        
+        if tool_name == "mcp_read_resource":
+            uri = arguments.get("uri")
+            if not uri:
+                return "Error: URI is required"
+            try:
+                contents = await self.read_resource(uri)
+                if isinstance(contents, list) and len(contents) > 0:
+                    content = contents[0]
+                    if hasattr(content, 'text'):
+                        return content.text
+                    return str(content)
+                return str(contents)
+            except Exception as e:
+                return f"Error reading resource: {str(e)}"
