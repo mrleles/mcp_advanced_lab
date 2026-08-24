@@ -34,3 +34,13 @@ class MCPHTTPHostApp(MCPHTTPClient):
                     }
                 }
             }
+
+            if hasattr(tool, 'inputSchema') and tool.inputSchema:
+                schema = tool.inputSchema
+                if isinstance(schema, dict):
+                    if "properties" in schema:
+                        tool_schema["function"]["parameters"]["properties"] = schema["properties"]
+                    if "required" in schema and schema["required"]:
+                        tool_schema["function"]["parameters"]["required"] = schema["required"]
+
+            openai_tools.append(tool_schema)
