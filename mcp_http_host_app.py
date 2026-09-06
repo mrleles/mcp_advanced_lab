@@ -172,3 +172,180 @@ class MCPHTTPHostApp(MCPHTTPClient):
                 return result
             except Exception as e:
                 return f"Error getting prompt: {str(e)}"
+
+        try:
+            result = await self.call_tool(tool_name, arguments)
+
+            if isinstance(result, list) and len(result) > 0:
+                content = result[0]
+                if hasattr(content, 'text'):
+                    text_result = content.text
+                else:
+                    text_result = str(content)
+            elif hasattr(result, 'text'):
+                text_result = result.text
+            else:
+                text_result = str(result)
+
+            return text_result
+
+        except Exception as e:
+            return f"Error executing tool: {str(e)}"
+
+    async def chat(self, user_message: str, history: list):
+        """Chat with the LLM using MCP tools."""
+        await self.connect()
+
+        self.conversation_history.append({
+            "role": "user",
+            "content": user_message
+        })
+
+        tools = await self.get_available_tools()
+
+        if tools:
+            response = self.llm_client.chat.completions.create(
+                model=self.model,
+                messages=self.conversation_history,
+                tools=tools,
+                tool_choice="auto"
+            )
+        else:
+            response = self.llm_client.chat.completions.create(
+                model=self.model,
+                messages=self.conversation_history
+            )
+
+        if not response or not response.choices:
+            return "Error: No response from LLM"
+
+        assistant_message = response.choices[0].message
+
+        if assistant_message.tool_calls:
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": assistant_message.content or "",
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function_name,
+                            "arguments": tc.function_arguments
+                        }
+                    }
+                    for tc in assistant_message.tool_calls
+                ]
+            })
+
+            for tool_call in assistant_message.tool_calls:
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments)
+                tool_result = await self.execute_tool(function_name, function_args)
+
+                self.conversation_history.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": str(tool_result)
+                })
+
+            final_response = self.llm_client.chat.completions.create(
+                model=self.model,
+                messages=self.conversation_history
+            )
+
+            if not final_response or not final_response.choices:
+                return "Error: No response from LLM after tool execution"
+
+            final_message = final_response.choices[0].message.content
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": final_message
+            })
+
+            return final_message
+
+        else:
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": assistant_message.content
+            })
+
+            return assistant_message.content
+
+    def create_interface(self):
+        """Create the Gradio chat interface."""
+
+        async def chat_wrapper(message, history):
+            """Wrapper for chat method compatible with Gradio."""
+            if not message.strip():
+                return history
+
+            response = await self.chat(message, history)
+            return history + [
+                {"role": "user", "content": message},
+                {"role": "assistant", "content": response}
+            ]
+
+        async def reset_conversation():
+            """Reset the conversation history."""
+            self.conversation_history = []
+            return []
+
+        with gr.Blocks(title="MCP HTTP AI Host") as interface:
+            gr.Markdown(f"""
+            # MCP HTTP AI Host
+            Chat with GPT-4o-mini using tools from the MCP HTTP server.
+
+            **Server:** {self.server_url}
+            **Workspace Roots:** {self.roots_dir}
+            **Model:** {self.model}
+
+            The AI can use all available MCP tools, resources, and prompts during the conversation.
+            """)
+
+            chatbot = gr.Chatbot(
+                label="Conversation",
+                height=500,
+                type="messages"
+            )
+
+            with gr.Row():
+                msg = gr.Textbox(
+                    label="Your message",
+                    placeholder="Ask me to use MCP tools...",
+                    scale=4
+                )
+                clear = gr.Button("Clear", scale=1)
+
+            msg.submit(
+                fn=chat_wrapper,
+                inputs=[msg, chatbot],
+                outputs=chatbot
+            ).then(
+                lambda: "",
+                outputs=msg
+            )
+
+            clear.click(
+                fn=reset_conversation,
+                outputs=chatbot
+            )
+
+        return interface
+
+    def main():
+        if len(sys.argv) < 3:
+            print("Usage: python mcp_http_host_app.py <server_url> <roots_dir>")
+            print("Example: python mcp_http_host_app.py http://127.0.0.1:8080/path/to/workspace")
+            sys.exit(1)
+
+        server_url = sys.argv[1]
+        roots_dir = sys.argv[2]
+
+        client = MCPHTTPHostApp(server_url, roots_dir)
+        interface = client.create_interface()
+        interface.queue().launch(server_name="127.0.0.1", server_port=7862)
+
+    if __name__ == "__main__":
+        main()
