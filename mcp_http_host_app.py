@@ -334,18 +334,18 @@ class MCPHTTPHostApp(MCPHTTPClient):
 
         return interface
 
-    def main():
-        if len(sys.argv) < 3:
-            print("Usage: python mcp_http_host_app.py <server_url> <roots_dir>")
-            print("Example: python mcp_http_host_app.py http://127.0.0.1:8080/path/to/workspace")
-            sys.exit(1)
+def main():
+    if len(sys.argv) < 3:
+        print("Usage: python mcp_http_host_app.py <server_url> <roots_dir>")
+        print("Example: python mcp_http_host_app.py http://127.0.0.1:8080/path/to/workspace")
+        sys.exit(1)
 
-        server_url = sys.argv[1]
-        roots_dir = sys.argv[2]
+    server_url = sys.argv[1]
+    roots_dir = sys.argv[2]
 
-        client = MCPHTTPHostApp(server_url, roots_dir)
-        interface = client.create_interface()
-        interface.queue().launch(server_name="127.0.0.1", server_port=7862)
+    client = MCPHTTPHostApp(server_url, roots_dir)
+    interface = client.create_interface()
+    interface.queue().launch(server_name="127.0.0.1", server_port=7862)
 
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()
