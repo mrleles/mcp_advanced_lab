@@ -230,8 +230,8 @@ class MCPHTTPHostApp(MCPHTTPClient):
                         "id": tc.id,
                         "type": "function",
                         "function": {
-                            "name": tc.function_name,
-                            "arguments": tc.function_arguments
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments
                         }
                     }
                     for tc in assistant_message.tool_calls
